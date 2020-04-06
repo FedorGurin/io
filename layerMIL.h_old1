@@ -1,0 +1,668 @@
+#ifndef PRESENTMIL_H
+#define PRESENTMIL_H
+
+#include "DesMkioVx.h"
+#include "MonMil.h"
+//#include <stl.h>
+#include <vector>
+
+using namespace std;
+//#define WITH_FAULT
+namespace LayerMIL
+{
+//! описание линий
+enum MIL_LINE
+{
+    CHANNEL_MIL_1 = 0,
+    CHANNEL_MIL_2 = 1,
+    CHANNEL_MIL_3 = 2,
+    CHANNEL_MIL_4 = 3
+};
+//! номер адаптера
+enum MIL_ADAPTER
+{
+    ADAPTER_MIL_1 = 0,
+    ADAPTER_MIL_2 = 1,
+    ADAPTER_MIL_3 = 2,
+    ADAPTER_MIL_4 = 3,
+    ADAPTER_MIL_5 = 4,
+    ADAPTER_MIL_6 = 5
+};
+//! операции с адптером при записи и отправки информации
+enum TSetFlagOU
+{
+    F_WRITE          = 1, /*только запись в буфер*/
+    F_SEND           = 2, /*только отправка данных из буфера в память адаптера*/
+    F_WRITE_AND_SEND = 3  /*запись в буфер и отправка данных в память адаптера*/
+};
+
+enum TFaultsOU
+{
+    NO_FAULTS       = 0,  /*ошибок нет*/
+    OU_FAULT        = 1,  /*неисправность подсистемы ОУ*/
+    AB_FAULT        = 2,  /*неисправность терминала ОУ*/
+    BUSY_AB_FAULT   = 4,  /*абонент занят*/
+    PARITY_FAULT    = 8,  /*ошибка четности*/
+    BREAK_MAIN_LINE = 16, /*обрыв основной линии*/
+    BREAL_RES_LINE  = 32, /*обрыв резервной линии*/
+    ERROR_MSG_FAULT = 64, /*ошибка в сообщении*/
+    REQUEST_SERVICE = 128/*запрос на обcлуживание*/
+};
+
+enum TGetFlagOU
+{
+    F_RECIVE            = 1,/*получение данных из адаптера и копирование их в буфер*/
+    F_READ              = 2,/*чтение данных из буфера*/
+    F_RECIVE_AND_READ   = 3 /*получение данных из адаптера, копирование в буфер и финальное чтение данных из буфера*/
+};
+    enum TTransDirect
+    {
+        CONTROLLER_OU=0, /*информация от Контроллера->в ОУ*/
+        OU_CONTROLLER=1  /*информация от ОУ->в Контроллер*/
+    };
+    enum TValueType
+    {
+        F_DOUBLE,
+        F_FLOAT,
+        F_INT,
+        F_TWOWORDS,
+        F_CODE,
+        F_BIT
+    };
+    enum TSIGN
+    {
+        F_USIGN,/*без знака*/
+        F_SIGN  /*со знаком*/
+    };
+    enum TORDER
+    {
+        MIL_ORDER,  /*нумерация битов согласно стандарту МКИО*/
+        INTEL_ORDER /*нумерация битов согласно стандарту Intel*/
+    };
+
+    //! один параметр
+    typedef struct TParam_
+    {
+        TParam_(void *addr_,
+               int numWord_,
+               TValueType toType_,
+               TValueType fromType_,
+               int lBit_,
+               int hBit_,
+               double scale_ = 0.0,
+               TSIGN sign_ = F_SIGN,
+               TORDER order = INTEL_ORDER)
+        {
+            addr     = addr_;
+            numWord  = numWord_;
+            toType   = toType_;
+            fromType = fromType_;
+
+            lBit     = lBit_;
+            hBit     = hBit_;
+
+            if(order == MIL_ORDER)
+            {
+                lBit-=4;hBit-=4;
+            }
+            scale   = scale_;
+            sign    = sign_;
+        }
+
+        void *addr;
+        int numWord;
+        TValueType toType;
+        TValueType fromType;
+        int lBit;
+        int hBit;
+        double scale;
+        TSIGN sign;
+    }TParam;
+//! класс описания параметров
+class ParamMIL
+{
+public:
+    ParamMIL()
+    {
+        params.clear();
+
+        des_data.NumParam=0;
+        des_data.DEFAROU=0;
+        des_data.DesParamMkio=0;
+    }
+    ~ParamMIL()
+    {
+
+    }
+    unsigned short int codeParam16(int index) //! index - номер параметра, начинается с 0
+    {
+        if(index<0) index=0;
+        else if(index>31) index=31;
+
+        return des_data.DEFAROU->ArrAtmk.SI[index];
+    }
+    void setCodeParam16(int index,int value) //! index - номер параметра, начинается с 0
+    {
+        if(index<0) index=0;
+        else if(index>31) index=31;
+
+        des_data.DEFAROU->ArrAtmk.SI[index]=value;
+    }
+    //! прочитать значение параметра
+    unsigned int codeParam32(int index) //! index - номер параметра, начинается с 0
+    {
+        if(index<0) index=0;
+        else if(index>15) index=15;
+
+        return des_data.DEFAROU->ArrAtmk.LI[index];
+    }
+    //! изменить значение параметра
+    void setCodeParam32(int index,int value) //! index - номер параметра, начинается с 0
+    {
+        if(index<0) index=0;
+        else if(index>15) index=15;
+
+        des_data.DEFAROU->ArrAtmk.LI[index]=value;
+    }
+    //! добавить параметр по МКИО(в конкретный подадрес)
+    void addParamMIL(TParam in)
+    {
+        TDesParamMkio param;
+
+        param.AdrData=      in.addr;
+        param.NumberWord=   in.numWord;
+
+        if(in.toType == F_DOUBLE)
+            param.InType = DOUBLE;
+        else if(in.toType == F_FLOAT)
+            param.InType = FLOATM;
+        else if(in.toType == F_CODE)
+            param.InType = CODEM;
+        else if(in.toType == F_INT)
+            param.InType = INTEGER;
+        else if(in.toType == F_TWOWORDS)
+            param.InType = TWOWORDS;
+
+        if(in.fromType == F_DOUBLE)
+            param.OutType = DOUBLE;
+        else if(in.fromType == F_FLOAT)
+            param.OutType = FLOATM;
+        else if(in.fromType == F_CODE)
+            param.OutType = CODEM;
+        else if(in.fromType == F_INT)
+            param.OutType = CODEM;
+        else if(in.fromType == F_BIT)
+                   param.OutType = BITM;
+
+        else if(in.fromType == F_TWOWORDS)
+            param.OutType = TWOWORDS;
+        /*param.InType=       in.toType;
+        param.OutType=      in.fromType;*/
+
+        param.Beg=          in.lBit;
+        param.End=          in.hBit;
+
+        param.Scale=        in.scale;
+        param.Sign=         in.sign;
+
+        params.push_back(param);
+    }
+    //! создать параметры
+    void endOfParams()
+    {
+        
+        
+        des_data.DesParamMkio=new TDesParamMkio[params.size()];
+
+        int maxNumber = 0;
+        for(unsigned i=0;i<params.size();i++)
+        {
+            des_data.DesParamMkio[i]=params[i];
+            maxNumber++;
+            if(params[i].OutType == TWOWORDS)
+            	maxNumber++;
+            
+        }
+        des_data.NumParam=params.size();
+    }
+    int checkKC(int RT=0, int numParams=-1) //RT(Recive(0)/Transmit(1)
+    {
+        short int KC;
+        //! номер оконечника, прием/передача
+        KC = (des_data.DEFAROU->DEFOU4MOM->AdrAbonent<<11)|
+         (des_data.DEFAROU->SubAdr<<5)| (RT<<10);
+        if(numParams==-1)
+            KC|=(des_data.NumParam);
+        else
+            KC|=numParams;
+        return MOMVerifyInKC(des_data.DEFAROU->DEFOU4MOM,KC);
+    }
+    //! кол-во слов в подадресе
+    int sizeWords(){return params.size();}
+    TDesDataMkio*  des(){return &des_data;}
+private:
+    //! параметры передаваемые по МКИО
+    vector <TDesParamMkio> params;
+    //! описание параметров(массив)
+    TDesDataMkio  des_data;
+};
+
+
+//! одноканальный адаптер МКИО в режиме ОУ
+class Ou_1CH_MIL
+{
+public:
+    Ou_1CH_MIL(MIL_LINE line,
+               int addrOU,
+               MIL_ADAPTER adapter)
+    {
+        ou_.NumbrtInterface=   line;
+        ou_.AdrAbonent=      addrOU;
+    }
+    Ou_1CH_MIL(int line,
+               int addrOU,
+               int adapter)
+    {
+        ou_.NumbrtInterface=   line;
+        ou_.AdrAbonent=      addrOU;
+    }
+    //! включение оконечника
+    void setOn(bool on)
+    {
+        SetUpOu(&ou_,0,on);
+    }
+    //! задать тип неисправности
+    void setFault(int fault)
+    {
+#ifdef WITH_FAULT
+        if(fault == 0) //нет ошибок
+            ClearFeaturesOu(&ou_,
+                            _ATMK32_FAULT_ABONENT|
+                            _ATMK32_FAULT_RT|
+                            _ATMK32_ABONENT_BUSY|
+                            _ATMK32_PARYTI_FAULT|
+                            _ATMK32_BREAK_MAIN_LINE|
+                            _ATMK32_BREAK_RESERVE_LINE|
+                            _ATMK32_SERVICE_DEMAND);
+        if(fault&OU_FAULT >0)
+            SetFeaturesOu(&ou_,_ATMK32_FAULT_ABONENT);
+        if(fault&AB_FAULT>0)
+            SetFeaturesOu(&ou_,_ATMK32_FAULT_RT);
+        if(fault&BUSY_AB_FAULT>0)
+            SetFeaturesOu(&ou_,_ATMK32_ABONENT_BUSY);
+        if(fault&PARITY_FAULT>0)
+            SetFeaturesOu(&ou_,_ATMK32_PARYTI_FAULT);
+        if(fault&BREAK_MAIN_LINE>0)
+            SetFeaturesOu(&ou_,_ATMK32_BREAK_MAIN_LINE);
+        if(fault&BREAL_RES_LINE>0)
+            SetFeaturesOu(&ou_,_ATMK32_BREAK_RESERVE_LINE);
+        if(fault&REQUEST_SERVICE>0)
+            SetFeaturesOu(&ou_,_ATMK32_SERVICE_DEMAND);
+#endif
+    }
+    //! передать в ОУ
+    void setOU(ParamMIL *param,TSetFlagOU flag=F_WRITE_AND_SEND)
+    {
+        if(flag==F_WRITE || flag==F_WRITE_AND_SEND)
+        {
+            ParametrOutMkio(param->des());
+        }
+        if(flag==F_SEND || flag==F_WRITE_AND_SEND)
+        {
+             SendDataToAdaper((param->des())->DEFAROU);
+        }
+    }
+    //! получить из ОУ
+    void getOU(ParamMIL *param,TGetFlagOU flag=F_RECIVE_AND_READ)
+    {
+        if(flag==F_RECIVE || flag==F_RECIVE_AND_READ)
+        {
+            GetDataFromAdaper(param->des()->DEFAROU);
+        }
+        if(flag==F_READ || flag==F_RECIVE_AND_READ)
+        {
+             ParametrInMkio(param->des());
+        }
+    }
+    //! добавление подадресов
+    void addParamToSubAddr(int subAddr,ParamMIL  *param)
+    {
+        param->endOfParams();
+        //поиск для указанного подадреса наличия параметров, если параметров нет, то добавляем
+        //////////////////////////////////////////////////////////
+        TKDEFAROU *temp_des=new TKDEFAROU;
+
+        temp_des->SubAdr=subAddr;
+        temp_des->DEFIN=&ou_;
+        temp_des->Buffering=BUFFERING;
+
+        for(int i=0;i<16;i++)
+            temp_des->ArrAtmk.LI[i]=0;
+        des.push_back(temp_des);
+        ///////////связываем параметры с подадресами
+        param->des()->DEFAROU=temp_des;
+
+        //! сохраним указатель
+        params.push_back(param);
+    }
+private:
+    //! описание 1 канального адапетра
+    TKDEFOU ou_;
+    //! описание данных(у каждого описания свои передаваемые параметры)
+    vector <TKDEFAROU*>     des;
+    //! параметры передаваемые по МКИО
+    vector <ParamMIL* >      params;
+};
+//! 4ех канальный адаптер МКИО в режиме ОУ
+class Ou_4CH_MIL
+{
+public:
+    Ou_4CH_MIL(MIL_LINE line,
+               int addrOU,
+               MIL_ADAPTER adapter)
+    {
+        ou_.NumberAdapter=   adapter;
+        ou_.NumbrtInterface=   line;
+        ou_.AdrAbonent=      addrOU;
+        ou_.StatData=        0;
+        SetRegimeRT(adapter,line,1);
+    }
+    Ou_4CH_MIL(int line,
+               int addrOU,
+               int adapter)
+    {
+        ou_.NumberAdapter=   adapter;
+        ou_.NumbrtInterface= line;
+        ou_.AdrAbonent=      addrOU;
+        ou_.StatData=        0;
+    }
+    //! задать тип неисправности
+    void setFault(int fault)
+    {
+        if(des.size() == 0)
+            return ;
+#ifdef WITH_FAULT
+        if(fault == 0) //нет ошибок
+            MOMClearFeaturesOu(des[0],
+                               _MOM4_SERVICE_DEMAND |
+                               _MOM4_FAULT_ABONENT |
+                               _MOM4_FAULT_RT |
+                               _MOM4_ABONENT_BUSY |
+                               _MOM4_PARYTI_FAULT |
+                               _MOM4_BREAK_MAIN_LINE|
+                               _MOM4_BREAK_RESERVE_LINE);
+        if(fault&OU_FAULT >0)
+            MOMSetFeaturesOu(des[0],_MOM4_FAULT_ABONENT);
+        if(fault&AB_FAULT>0)
+            MOMSetFeaturesOu(des[0],_MOM4_FAULT_RT);
+        if(fault&BUSY_AB_FAULT>0)
+            MOMSetFeaturesOu(des[0],_MOM4_ABONENT_BUSY);
+        if(fault&PARITY_FAULT>0)
+            MOMSetFeaturesOu(des[0],_MOM4_PARYTI_FAULT);
+        if(fault&BREAK_MAIN_LINE>0)
+            MOMSetFeaturesOu(des[0],_MOM4_BREAK_MAIN_LINE);
+        if(fault&BREAL_RES_LINE>0)
+            MOMSetFeaturesOu(des[0],_MOM4_BREAK_RESERVE_LINE);
+        if(fault&REQUEST_SERVICE>0)
+            MOMSetFeaturesOu(des[0],_MOM4_SERVICE_DEMAND);
+#endif
+    }
+    //! проверка работает ли контроллер
+    unsigned int countAnswerOU()
+    {
+        //return GetCountAnswerOU(ou_.NumbrtInterface,ou_.AdrAbonent);
+        return 0;
+    }
+
+    //! проверка отвечает ли ОУ
+    unsigned int countNoAnswerOU()
+    {
+        //return GetCountNoAnswerOU(ou_.NumbrtInterface,ou_.AdrAbonent);
+        return 0;
+    }
+    //! проверка прихода КС для данного ОУ
+    bool setCheckKC(int formatKC)
+    {
+        return MOMVerifyInKC(&ou_,formatKC);
+    }
+    //! передать в ОУ
+    void setOU(ParamMIL *param,TSetFlagOU flag=F_WRITE_AND_SEND)
+    {
+
+        if(flag==F_WRITE || flag==F_WRITE_AND_SEND)
+        {
+            ParametrOutMkio(param->des());
+        }
+        if(flag==F_SEND || flag==F_WRITE_AND_SEND)
+        {
+             SendDataToAdaperMOM(param->des()->DEFAROU);
+        }
+    }
+
+    //! получить из ОУ
+    void getOU(ParamMIL *param,TGetFlagOU flag=F_RECIVE_AND_READ)
+{
+        if(flag==F_RECIVE || flag==F_RECIVE_AND_READ)
+    {
+            GetDataFromAdaperMOM(param->des()->DEFAROU);
+    }
+        if(flag==F_READ || flag==F_RECIVE_AND_READ)
+    {
+             ParametrInMkio(param->des());
+        }
+    }
+    void clearSubAddr(ParamMIL  *param)
+    {
+        memset((void*)&(param->des()->DEFAROU->ArrAtmk),0,sizeof(TArrAtmk));
+        SendDataToAdaperMOM(param->des()->DEFAROU,1);
+        SendDataToAdaperMOM(param->des()->DEFAROU,0);
+    }
+    //! добавление подадресов
+    void addParamToSubAddr(int subAddr,ParamMIL  *param)
+    {
+        param->endOfParams();
+        //////////////////////////////////////////////////////////
+        TKDEFAROU *temp_des=new TKDEFAROU;
+
+        temp_des->SubAdr=subAddr;
+        temp_des->DEFOU4MOM=&ou_;
+        temp_des->Buffering=BUFFERING;
+
+        for(int i=0;i<16;i++)
+            temp_des->ArrAtmk.LI[i]=0;
+        des.push_back(temp_des);
+        ///////////связываем параметры с подадресами
+        param->des()->DEFAROU=temp_des;
+
+        //! сохраним указатель
+        params.push_back(param);
+    }
+    //! включение оконечника
+    void setOn(bool on)
+    {
+        SetUpOu(&ou_,on);
+        SetRegimeRT(ou_.NumberAdapter,ou_.NumbrtInterface,on);
+    }
+private:
+    //! слово отказов
+    int faults_word;
+    //! описание 4ех канального адапетра
+    TKDEFOU4MOM  ou_;
+    //! описание данных(у каждого описания свои передаваемые параметры)
+    vector <TKDEFAROU*>     des;
+    //! параметры передаваемые по МКИО
+    vector <ParamMIL* >    params;
+};
+//! обобщенный класс адаптера МКИО
+template <class T> class Ou_MIL
+{
+public:
+    Ou_MIL(MIL_LINE line,       /*номер линии*/
+           int addrOU,          /*адрес ОУ*/
+           MIL_ADAPTER adapter  /*номер адаптера*/
+           )
+    {
+		enable_=false;
+        ou=new T(line,addrOU,adapter);
+    }
+    Ou_MIL(int line,       /*номер линии*/
+           int addrOU,          /*адрес ОУ*/
+           int adapter  /*номер адаптера*/
+           )
+    {
+		enable_=false;
+        ou=new T(line,addrOU,adapter);
+    }
+    //! передать в ОУ
+    void setOU(ParamMIL *param,TSetFlagOU flag=F_WRITE_AND_SEND)
+    {
+        ou->setOU(param,flag);
+    }
+    //! получить из ОУ
+    void getOU(ParamMIL *param,TGetFlagOU flag=F_RECIVE_AND_READ)
+    {
+        ou->getOU(param,flag);
+    }
+    //! добавление подадресов
+    void addParamToSubAddr(int subAdr,ParamMIL  *param)
+    {
+        ou->addParamToSubAddr(subAdr,param);
+    }
+    //! задать тип неисправности
+    void setFault(int fault)
+    {
+        ou->setFault(fault);
+    }
+
+    //! обнуление подадреса с параметрами указанными в param
+    void clearSubAddr(ParamMIL  *param)
+    {
+        ou->clearSubAddr(param);
+    }
+    //! проверка прихода КС для данного ОУ
+    bool setCheckKC(int formatKC)
+    {
+    	return ou->setCheckKC(formatKC);
+    }
+    //! функции включения/отключения адаптера
+    void switchOn()
+    {
+		if(enable_ == false)
+        {
+            enable_= true;
+        ou->setOn(true);
+    }
+    }
+    T *spec()
+    {
+        return ou;
+    }
+
+    void switchOff()
+    {
+		if(enable_ == true)
+        {
+            enable_=false;
+        ou->setOn(false);
+    }
+    }
+    void enable(bool value)
+    {
+		if(enable_ != value)
+        {
+            enable_=value;
+        ou->setOn(value);
+    }
+    }
+    void enable(int value)
+    {
+		if(enable_ != value)
+        {
+            enable_=value;
+        ou->setOn(value);
+    }
+    }
+private:
+    //! спецификация ОУ
+    T *ou;
+	bool enable_;
+};
+//! 4ех канальный монитор МКИО
+class Monitor_4CH_MIL
+{
+public:
+    Monitor_4CH_MIL(int line_,
+                    int addrOU_)
+    {
+        line=line_;
+        addrOU=addrOU_;
+    }
+    //! структура данных
+    typedef struct
+    {
+        ParamMIL* param;
+        TTransDirect trans;
+        int subAddr;
+    }TMonParam;
+
+    //! получить данные из монитора
+    void getMonitor()
+    {
+        for(unsigned i=0;i<params.size();i++)
+        {
+            //! addrOU - адрес оконечного устройства, subAddr - подадрес ОУ, режим RS - recive(RS=0)/send(RS=1)
+            GetWordsMkioMonitor(line,
+                                FormIdSource(addrOU,
+                                             params[i].trans,
+                                             params[i].subAddr),
+                                (WORD*)&(params[i].param->des()->DEFAROU->ArrAtmk));
+            //! распаковка данных
+            ParametrInMkio(params[i].param->des());
+        }
+    }
+    //! связывание подадреса с параметрами
+    void addParamToSubAddr(int subAddr,TTransDirect trans, ParamMIL  *param)
+    {
+        param->endOfParams();
+
+        TMonParam p;
+        p.param=param;
+        p.trans=trans;
+        p.subAddr=subAddr;
+
+        params.push_back(p);
+    }
+private:
+    //! номер линии
+    int line;
+    //! адрес ОУ
+    int addrOU;
+    //! параметры передаваемые по МКИО
+    vector <TMonParam>    params;
+};
+
+//! класс монитора МКИО
+template <class T> class Monitor_MIL
+{
+public:
+    Monitor_MIL(int line,
+                int addrOU)
+    {
+        mon=new T(line,addrOU);
+    }
+    //! связывание подадреса с параметрами
+    void addParamToSubAddr(int subAdr,TTransDirect trans, ParamMIL  *param)
+    {
+        mon->addParamToSubAddr(subAdr,trans,param);
+    }
+    //! получить все данные из Монитора
+    void getMonitor()
+    {
+        mon->getMonitor();
+    }
+private:
+    //! спецификация ОУ
+    T *mon;
+};
+}
+#endif // PRESENTMIL_H
