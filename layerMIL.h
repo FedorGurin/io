@@ -314,7 +314,7 @@ public:
     static bool isRead(uint16_t idCh)
     {
         TCh* ch = HAL::obj()->findCh(idCh);
-        return (ch->setting.ioCh==0);
+        return (ch->setting.ioCh == 0);
     }
     static uint16_t* getPtrToValue(uint16_t idCh,uint16_t guidParam)
     {
