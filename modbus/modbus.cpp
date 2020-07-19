@@ -4,6 +4,11 @@
 
 #include "modbus.h"
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/ioctl.h>
+#include <stdio.h>
+#include <errno.h>
 using namespace std;
 
 
@@ -19,6 +24,21 @@ modbus::modbus(string host_, uint16_t port_ = 502) {
     _slaveid = 1;
     _msg_id = 1;
     _connected = false;
+
+    if(HOST == "" || PORT == 0) {
+            std::cout << "Missing Host and Port" << std::endl;
+            //return false;
+        } else {
+            std::cout << "Found Proper Host "<< HOST << " and Port " <<PORT <<std::endl;
+        }
+
+
+      /*  int noBlock = 1;
+        int res = ioctl(_socket,FIONBIO,(int)&noBlock);
+        if(res == -1)
+        {
+        	 std::cout <<"Can`t set block regime" << std::endl;
+        }*/
 
 }
 
@@ -44,31 +64,33 @@ void modbus::modbus_set_slave_id(int id) {
  * Build up a Modbus/TCP Connection
  * @return   If A Connection Is Successfully Built
  */
-bool modbus::modbus_connect() {
-    if(HOST == "" || PORT == 0) {
-        std::cout << "Missing Host and Port" << std::endl;
-        return false;
-    } else {
-        std::cout << "Found Proper Host "<< HOST << " and Port " <<PORT <<std::endl;
-    }
-
+bool modbus::modbus_connect()
+{
     _socket = socket(AF_INET, SOCK_STREAM, 0);
-    if(_socket == -1) {
+    if(_socket == -1)
+    {
         std::cout <<"Error Opening Socket" <<std::endl;
-        return false;
-    } else {
+
+    }else
+    {
         std::cout <<"Socket Opened Successfully" << std::endl;
     }
-
     _server.sin_family = AF_INET;
     _server.sin_addr.s_addr = inet_addr(HOST.c_str());
     _server.sin_port = htons(PORT);
 
-    if (connect(_socket, (struct sockaddr*)&_server, sizeof(_server)) < 0) {
-        std::cout<< "Connection Error" << std::endl;
+    int status = connect(_socket, (struct sockaddr*)&_server, sizeof(_server));
+    if (status < 0)
+    {
+        printf( "That means: %s\n", strerror( errno ) );
+        if(_connected == true)
+        {
+            modbus_close();
+        }
+        _connected = false;
+
         return false;
     }
-
     std::cout<< "Connected" <<std::endl;
     _connected = true;
     return true;
@@ -329,9 +351,16 @@ void modbus::modbus_write_coil(int address, bool to_write) {
 void modbus::modbus_write_register(int address, uint16_t value) {
     if(_connected) {
         if(address > 65535) {
-        	std::cout<<"modbus_amount_exception"<<std::endl;
+            std::cout<<"modbus_amount_exception"<<std::endl;
         }
-        modbus_write(address, 1, WRITE_REG, &value);
+        ssize_t res = modbus_write(address, 1, WRITE_REG, &value);
+//        if(res == -1 )
+//        {
+//            _connected = false;
+//            printf( "That means2: %s\n", strerror( errno ) );
+//            modbus_close();
+//            return;
+//        }
         uint8_t to_rec[MAX_MSG_LENGTH];
         ssize_t k = modbus_receive(to_rec);
         //try{
@@ -419,6 +448,8 @@ void modbus::modbus_write_registers(int address, int amount, uint16_t *value) {
 ssize_t modbus::modbus_send(uint8_t *to_send, int length) {
     _msg_id++;
     int addr = 0;
+
+
     return send(_socket, to_send, (size_t)length, addr);
 }
 
@@ -438,47 +469,52 @@ ssize_t modbus::modbus_receive(uint8_t *buffer) {
  * @param msg   Message Received from the Server
  * @param func  Modbus Functional Code
  */
-void modbus::modbus_error_handle(uint8_t *msg, int func) {
-    if(msg[7] == func + 0x80) {
+void modbus::modbus_error_handle(uint8_t *msg, int func)
+{
+    if(msg[7] == func + 0x80)
+    {
         switch(msg[8]){
-            case EX_ILLEGAL_FUNCTION:
-            {
-                std::cout<< "modbus_illegal_function_exception"<<std::endl;
-                break;
-            }
-            case EX_ILLEGAL_ADDRESS:
-            {
-            	std::cout<< "modbus_illegal_address_exception"<<std::endl;
-            	break;
-            }
-            case EX_ILLEGAL_VALUE:
-            {
-            	std::cout<< "modbus_illegal_data_value_exception"<<std::endl;
-            	break;
-            }
-            case EX_SERVER_FAILURE:
-            {
-            	std::cout<< "modbus_server_failure_exception"<<std::endl;
-            	break;
-            }
-            case EX_ACKNOWLEDGE:
-            {
-            	std::cout<< "modbus_acknowledge_exception"<<std::endl;
-            	break;
-            }
-            case EX_SERVER_BUSY:
-            {
-            	std::cout<< "modbus_server_busy_exception"<<std::endl;
-            	break;
-            }
-            case EX_GATEWAY_PROBLEMP:
-            case EX_GATEWYA_PROBLEMF:
-            {
-            	std::cout<< "modbus_gateway_exception"<<std::endl;
-            	break;
-            }
-            default:
-                break;
+        case EX_ILLEGAL_FUNCTION:
+        {
+            std::cout<< "modbus_illegal_function_exception"<<std::endl;
+            break;
+        }
+        case EX_ILLEGAL_ADDRESS:
+        {
+            std::cout<< "modbus_illegal_address_exception"<<std::endl;
+            break;
+        }
+        case EX_ILLEGAL_VALUE:
+        {
+            std::cout<< "modbus_illegal_data_value_exception"<<std::endl;
+            break;
+        }
+        case EX_SERVER_FAILURE:
+        {
+            std::cout<< "modbus_server_failure_exception"<<std::endl;
+            modbus_close();
+            break;
+        }
+        case EX_ACKNOWLEDGE:
+        {
+            std::cout<< "modbus_acknowledge_exception"<<std::endl;
+            modbus_close();
+            break;
+        }
+        case EX_SERVER_BUSY:
+        {
+            std::cout<< "modbus_server_busy_exception"<<std::endl;
+            modbus_close();
+            break;
+        }
+        case EX_GATEWAY_PROBLEMP:
+        case EX_GATEWYA_PROBLEMF:
+        {
+            std::cout<< "modbus_gateway_exception"<<std::endl;
+            break;
+        }
+        default:
+            break;
         }
     }
 }

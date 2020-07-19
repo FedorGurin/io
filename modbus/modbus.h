@@ -73,6 +73,9 @@ public:
     bool modbus_connect();
     void modbus_close();
 
+    //! признак наличия соединения
+    bool isConnected(){return _connected;}
+
     void modbus_set_slave_id(int id);
 
     void modbus_read_coils(int address, int amount, bool* buffer);

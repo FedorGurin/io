@@ -10,7 +10,9 @@
 #ifdef VXWORKS_PLATFORM
 #include <Ar16t16rAPI.h>
 #endif
-
+#ifdef QNX_PLATFORM
+#include "qnxLayerArApi.h"
+#endif
 class LayerArincVx;
 
 template <class T> class AR_CONF
@@ -303,7 +305,73 @@ public:
     uint8_t switchBuf;
     uint8_t interval;
 };
-
+#ifdef QNX_PLATFORM
+class AR_CONF_VX
+{
+public:
+    AR_CONF_VX()
+    {
+        
+    }
+    static bool initApi()
+    {       
+        return OpenArincAPI() == OK;      
+    }
+    static uint8_t maxNumCh()
+    {
+        return numChannelArinc();        
+    }
+};
+class LayerArincQnx
+{
+public:
+    //! временная переменная на внутр. буфер с параметрами(пока только для отладки)
+    static uint32_t valChOut[256/*адресов*/*32/*бит слова*/];
+    static uint32_t valChIn[256/*адресов*/*32/*бит слова*/];
+    
+    //! произведем действие
+    //static void init(uint8_t io, T objInit)
+    static void init(uint8_t numCh,
+                     uint8_t io,
+                     uint8_t *listAddr,
+                     uint8_t lenAddr,
+                     uint8_t trans,
+                     uint8_t freq,
+                     uint8_t interval,
+                     uint8_t swicthBuf,
+                     uint8_t gotov)
+    {
+        /*if(io == 1)
+            SetModeTRArincAPI(numCh,
+                              lenAddr,
+                              listAddr,
+                              trans,
+                              freq,
+                              interval,
+                              swicthBuf,
+                              gotov);
+        else
+            SetModeRCArincAPI(numCh,
+                              lenAddr,
+                              listAddr,
+                              freq,
+                              swicthBuf,
+                              gotov);*/
+    }
+    static void writeTo(uint16_t numCh,uint8_t io,uint32_t val,uint8_t addr,uint8_t indexAddr)
+    {
+       // WriteLongWordArincAPI(numCh,io,indexAddr,swapChAddr(addr)|val);
+    }
+    static uint32_t readFrom(uint16_t numCh,uint8_t io,uint8_t addr,uint8_t indexAddr)
+    {
+        return 0;//ReadLongWordArincAPI(numCh,io,indexAddr);
+    }
+    static void switchCh(uint16_t numCh,uint8_t io,uint8_t value)
+    {
+        //SetStartArincAPI(numCh,io,value);        
+    }
+};
+#endif
 #ifdef VXWORKS_PLATFORM
 
 class AR_CONF_VX
@@ -374,19 +442,23 @@ public:
 #endif
 
 
-#ifndef VXWORKS_PLATFORM
-typedef LayerArincTempl<LayerArincDefault > LayerArinc;
-typedef LayerArincTempl<LayerArincDefault > LayerAr;
-typedef  AR_CONF<AR_CONF_QT> LayerConfAr;
-#else
 #ifdef VXWORKS_SIM
 typedef LayerArincTempl<LayerArincDefault > LayerArinc;
 typedef LayerArincTempl<LayerArincDefault > LayerAr;
 typedef  AR_CONF<AR_CONF_VX> LayerConfAr;
 #else
+#ifdef QNX_PLATFORM
+typedef LayerArincTempl<LayerArincQNX > LayerArinc;
+typedef LayerArincTempl<LayerArincQNX > LayerAr;
+typedef  AR_CONF<AR_CONF_QNX> LayerConfAr;
+#else
+#ifdef VXWORKS_PLATFORM
 typedef LayerArincTempl<LayerArincVx> LayerArinc;
 typedef LayerArincTempl<LayerArincVx> LayerAr;
 typedef  AR_CONF<AR_CONF_VX> LayerConfAr;
-#endif
+#else
+typedef LayerArincTempl<LayerArincDefault > LayerArinc;
+typedef LayerArincTempl<LayerArincDefault > LayerAr;
+typedef  AR_CONF<AR_CONF_QT> LayerConfAr;
 #endif
 #endif // LAYERSPECRTM_H

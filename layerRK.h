@@ -75,7 +75,7 @@ public:
     }
     uint16_t maxRksOut()
     {
-        return spec->maxRksout;
+        return spec->maxRksOut;
     }
     //! принудительная запись в устройство
     void writeToDevice()
@@ -101,7 +101,9 @@ public:
 
         return layer;
     }
-    uint8_t* rk(){return spec->rksIn;}
+    uint8_t* rkIn(){return spec->rksIn;}
+    uint8_t* rkOut(){return spec->rksOut;}
+
     uint16_t maxRK(){return spec.maxNumRK;}
 
 private:
@@ -138,17 +140,18 @@ public:
     //! принудительная запись в устройство
     void writeToDevice()
     {
-
+        
     }
+  
     //! принудительное чтение из устройства
     void readFromDevice()
     {
-
+        
     }
     //! указатель на массив РК
     uint8_t *rksIn;
     //! указатель на массив РК
-    uint8_t *rksOut;
+    uint8_t *rksOut;   
     //! максимальное кол-во РК в массиве
     uint16_t maxRksIn;
     uint16_t maxRksOut;
@@ -236,18 +239,25 @@ public:
 };
 #endif
 
-#ifdef VXWORKS_PLATFORM
-#ifdef VXWORKS_SIM
-typedef LayerTemplRK<LayerRKVx > LayerRK;
-typedef LayerRKVx TypeSpecRK;
-#else
-typedef LayerTemplRK<LayerRKVx > LayerRK;
-typedef LayerRKVx TypeSpecRK;
+#if defined(QNX_PLATFORM)
+#include "qnxLayerRK.h"
+typedef LayerTemplRK<QnxLayerRK> LayerRK;
+typedef QnxLayerRK TypeSpecRK;
 #endif
-#else
+
+#if !defined(VXWORKS_PLATFORM) && !defined(QNX_PLATFORM)
+#include "./qt/qtUdpSocket.h"
 typedef LayerTemplRK<LayerRKDefault> LayerRK;
 typedef LayerRKDefault TypeSpecRK;
 #endif
+
+#if defined(VXWORKS_PLATFORM)
+#include "vxUdpSocket.h"
+typedef LayerTemplRK<LayerRKVx > LayerRK;
+typedef LayerRKVx TypeSpecRK;
+#endif
+
+
 
 #endif // LAYERRK_H
 

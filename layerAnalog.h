@@ -216,13 +216,23 @@ public:
 };
 #endif
 
-#ifdef VXWORKS_PLATFORM
-typedef LayerTemplAnalog<LayerAnalogVx > LayerAnalog;
-typedef LayerAnalogVx TypeSpecAnalog;
-#else
-typedef LayerTemplAnalog<LayerAnalogDefault> LayerAnalog;
-typedef LayerAnalogDefault TypeSpecAnalog;
+
+#if defined(QNX_PLATFORM)
+#include "qnxLayerAnalog.h"
+typedef LayerTemplAnalog<QnxLayerAnalog> LayerAnalog;
+typedef QnxLayerAnalog TypeSpecAnalog;
 #endif
 
+#if !defined(VXWORKS_PLATFORM) && !defined(QNX_PLATFORM)
+#include "./qt/qtUdpSocket.h"
+typedef LayerTemplRK<LayerRKDefault> LayerRK;
+typedef LayerRKDefault TypeSpecRK;
+#endif
+
+#if defined(VXWORKS_PLATFORM)
+#include "vxUdpSocket.h"
+typedef LayerTemplRK<LayerRKVx > LayerRK;
+typedef LayerRKVx TypeSpecRK;
+#endif
 #endif // LAYERANALOG_H
 

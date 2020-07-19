@@ -1,11 +1,11 @@
 #include "layerRK.h"
-
 #ifdef VXWORKS_PLATFORM
 /*template<>*/ LayerRK* LayerRK::layer=0;
 /*template<>*/ TypeSpecRK *LayerRK::spec=0;
+
 #else
-template<> LayerRK* LayerRK::layer   = 0;
-template<> TypeSpecRK *LayerRK::spec = 0;
+template<> LayerRK* LayerRK::layer=0;
+template<> TypeSpecRK *LayerRK::spec=0;
 #endif
 
 #ifdef VXWORKS_PLATFORM
@@ -38,6 +38,7 @@ LayerRKVx::LayerRKVx()
     void LayerRKVx::init()
     {
         int stTr, stRs;
+        //std::cout<<"init RKVX"<<std::endl;
         stTr = init(sc_out,out_devices,HAL::obj()->numISA(E_A_TRREL48), &rksOut,TRREL48_DEVPATH);
         stRs = init(sc_in, in_devices, HAL::obj()->numISA(E_A_RSREL48), &rksIn ,RSREL48_DEVPATH);
         //! максимальное кол-во  разовых команд
@@ -66,10 +67,7 @@ LayerRKVx::LayerRKVx()
              TAdapterISA *devices,     /*кол-во устройств*/
              uint8_t     **sc_buf,
              char dev_name[])     /*буфер*/
-    {
-      
-       
-        int i = 0, retval;
+    {       
         char buffer[20];
         if(devices == 0)
             return -1;
@@ -95,6 +93,7 @@ LayerRKVx::LayerRKVx()
         sc_info->common.device_count = devices->numBaseAddr;
         sc_info->channel_count       = devices->numBaseAddr * REL48_CHANNELS_PER_BOARD;
               
+        return OK;
         /**sc_buf = (uint8_t *) calloc(sc_info->channel_count, sizeof(uint8_t));
         memset( (void *)*sc_buf, 0, sizeof(uint8_t) * sc_info->channel_count);*/
 //        if (*sc_buf == NULL)
@@ -113,16 +112,14 @@ LayerRKVx::LayerRKVx()
 
     }
     int LayerRKVx::sc_in_read()
-    {       
-        ssize_t retval;
-       
+    {              
         if(in_devices == ERROR)
             return ERROR;
         
         cmdRs.startChannel = 0;
         cmdRs.channelCount = sc_in->channel_count;
            
-        if ( (retval = read(in_devices,
+        if ( (read(in_devices,
                             (char*)&cmdRs,
                              sizeof(struct rsrel48ReadCmd)))!= sc_in->channel_count) 
         {
@@ -133,14 +130,27 @@ LayerRKVx::LayerRKVx()
         //! копируем данные из драйвера
         memcpy(rksIn,cmdRs.values,
                sizeof(uint8_t) * sc_in->channel_count);
+        //! копируем в структуру HAL
          
+        //! пробегаем по всем каналам
+        for(int  i = 0; i<HAL::obj()->chTable.numCh;i++)
+        {
+            TCh *ch = &(HAL::obj()->chTable.ch[i]);
+            
+            if(ch->typeNode == HAL::obj()->typeCurrentNode &&
+               ch->idNode   == HAL::obj()->currentNode &&
+               ch->typeCh   == E_CH_RK &&
+               ch->setting.ioCh == 0)
+            {
+                TDesRK *rk = (TDesRK*) ch->desData;
+                rk->value = rksIn[ch->setting.numCh];
+            }
+        }        
+        return OK;
     }
     //! выдача всех разовых команд которые накопили в буфере
     int LayerRKVx::sc_out_write()
-    {
-        int i = 0;
-        ssize_t retval;
-       
+    {      
         if(out_devices == ERROR)
             return -1;
         //! начальный канал
@@ -150,7 +160,7 @@ LayerRKVx::LayerRKVx()
         memcpy(cmdTr.values, rksOut,
                sizeof(uint8_t) * sc_out->channel_count);
 
-            if( (retval = write(out_devices,
+            if( (write(out_devices,
                                  (char*)&cmdTr,
                                  sizeof(struct trrel48WriteCmd))) != sc_out->channel_count)
             {
@@ -199,6 +209,7 @@ LayerRKVx::LayerRKVx()
     void LayerRKVx::readFromDevice()
     {
         bitsRead = 0;
+       
         sc_in_read();
         //! читаем сразу все каналы РК в EISA
         if(HAL::obj()->eisaAvailable == true)
@@ -239,4 +250,4 @@ LayerRKVx::LayerRKVx()
 //        delete devices;
 //        delete sc;
     }
-  #endif
+#endif

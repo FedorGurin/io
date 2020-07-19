@@ -3,7 +3,7 @@
 #include "hal.h"
 #include "globalNameID.h"
 #include <string.h>
-#include "layerSpecRTM.h"
+#include "layerAr.h"
 //! модуль обслуживания спец. циклограмм выдачи по Arinc
 ArServ::ArServ(uint32_t idClass,uint32_t idCh_, float step_):ICalculateElement(idClass,step_)
 {
@@ -38,7 +38,7 @@ void ArServ::calculate()
         }
          //! инициализируем канал
         LayerArinc::initCh(ch->setting.numCh, bufAddr, numAddr, ch->setting.ioCh, ar->freq, ar->type, ar->rev);
-        LayerArinc::switchAr(ch->setting.numCh, ch->setting.ioCh,1);
+        //LayerArinc::switchAr(ch->setting.numCh, ch->setting.ioCh,1);
         if(ch->setting.ioCh == 1)
         {
             for(int i=0;i<ar->numIndAddr[ar->curIndArray];i++)

@@ -9,7 +9,7 @@ JoyNet::JoyNet()
     maxCount    = 10;
     memset((void*)&params,0, sizeof(params));
 }
-void JoyNet::init(uint16_t port, std::string ip = " S")
+void JoyNet::init(uint16_t port, std::string ip = "")
 {
     if(initOk == true)
         return;

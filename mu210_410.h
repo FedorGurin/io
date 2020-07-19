@@ -22,16 +22,16 @@ const uint32_t REG_DO15       = 0x11E;// 0 - переключение логич
 const uint32_t BASE_ADDR_PERIOD_WORK_DO = 0x134;
 
 //!Коэффициент заполнения ШИМ выхода DO1 - DO16, 0...1000 (0,10 %), Чтение и запись, uint16_t
-const uint32_t BASE_ADDR_K_F_PWM_DO = 0x134;
+const uint32_t BASE_ADDR_K_F_PWM_DO = 0x154;
 
 //! Частота генератора импульсов выхода, 1...60000 (Гц),Чтение и запись UINT 16
 const uint32_t FREQ_GEN_DO1 = 0x174;
 const uint32_t FREQ_GEN_DO2 = 0x175;
 const uint32_t FREQ_GEN_DO3 = 0x176;
 //! Количество импульсов генератора импульсов выхода, 0...65535 (импульсов),Чтение и запись
-const uint32_t NUM_PWM_DO1  = 0x174;
-const uint32_t NUM_PWM_DO2  = 0x175;
-const uint32_t NUM_PWM_DO3  = 0x176;
+const uint32_t NUM_PWM_DO1  = 0x194;
+const uint32_t NUM_PWM_DO2  = 0x195;
+const uint32_t NUM_PWM_DO3  = 0x196;
 //! Диагностика выхода DO1 - DO16, (0 – выкл.1 – вкл.), Чтение и запись, UINT 16
 const uint32_t BASE_ADDR_DIAG_OUT_DO = 0x1B4;
 
@@ -42,7 +42,7 @@ const uint32_t ADDR_GET_BIT_MASK_OUTPUT = 0x1D4;
 const uint32_t ADDR_SET_BIT_MASK_OUTPUT = 0x1D6;
 
 //! Битовая маска Битовая маска диагностики реле и обрыва нагрузки выходов, 0...65535, Только чтение
-const uint32_t ADDR_SET_BIT_MASK_OUTPUT = 0x1D8;
+const uint32_t ADDR_SET_BIT_MASK_DIAG = 0x1D8;
 
 //! Тайм-аут перехода в безопасное состояние, 0...60 (секунд), UINT 8
 const uint32_t ADDR_TIMEOUT_SAFE_ST = 0x2BC;
